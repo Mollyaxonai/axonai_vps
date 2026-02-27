@@ -1,0 +1,6 @@
+## pycahe files
+**.pyc
+
+axon_ai.egg-info
+
+experiment_data/
