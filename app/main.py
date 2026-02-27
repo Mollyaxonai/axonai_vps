@@ -4,7 +4,7 @@ import uuid
 import json
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -13,18 +13,20 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 JOBS_DIR = Path(os.environ.get("JOBS_DIR", "/tmp/axon_jobs"))
 JOBS_DIR.mkdir(parents=True, exist_ok=True)
 
-OPENCAP_SCRIPT = APP_ROOT / "opencap-main.py"   # adjust if your file lives elsewhere
+# ✅ Point to the CLI script you showed (the file with __main__ + argparse).
+# Adjust this path to where that file actually lives in your repo.
+# Common cases:
+#   - if it's at repo root: APP_ROOT / "main.py"
+#   - if it's in app/:      APP_ROOT / "app" / "main.py"
+OPENCAP_SCRIPT = APP_ROOT / "app" / "main.py"
 
-app = FastAPI(title="AxonAI OpenCap Runner", version="0.1.0")
+app = FastAPI(title="AxonAI OpenCap Runner", version="0.2.0")
 
 
 class RunRequest(BaseModel):
-    # Put whatever your opencap-main.py expects
-    # Example placeholders:
-    subject_id: str = Field(..., description="Patient / subject identifier")
-    trial_name: str = Field(..., description="Trial name")
-    input_video_path: str = Field(..., description="Path inside container (or mounted volume)")
-    extra_args: Optional[Dict[str, Any]] = Field(default=None, description="Extra script args")
+    # Match your main.py CLI: --session_path required, --output_dir optional :contentReference[oaicite:1]{index=1}
+    session_path: str = Field(..., description="Session path (as expected by main.py)")
+    output_dir: Optional[str] = Field(default=None, description="Optional output directory")
 
 
 @app.get("/health")
@@ -40,6 +42,7 @@ def _job_paths(job_id: str):
         "stderr": job_dir / "stderr.log",
         "meta": job_dir / "meta.json",
         "exitcode": job_dir / "exitcode.txt",
+        "pid": job_dir / "pid.txt",
     }
 
 
@@ -55,35 +58,31 @@ def create_job(req: RunRequest):
     # Save request for traceability
     paths["meta"].write_text(json.dumps(req.model_dump(), indent=2))
 
-    # Build command line for your script.
-    # IMPORTANT: adapt these flags to match your opencap-main.py CLI.
+    # Build the command that matches main.py's argparse :contentReference[oaicite:2]{index=2}
     cmd = [
         "python",
         str(OPENCAP_SCRIPT),
-        "--subject-id", req.subject_id,
-        "--trial-name", req.trial_name,
-        "--input-video", req.input_video_path,
+        "--session_path", req.session_path,
     ]
+    if req.output_dir:
+        cmd += ["--output_dir", req.output_dir]
 
-    # Optional: pass extra args (key->value) as --key value
-    if req.extra_args:
-        for k, v in req.extra_args.items():
-            cmd += [f"--{k}", str(v)]
+    # ✅ Ensure we always record exit code.
+    # We do this by running a small shell wrapper that writes exitcode.txt.
+    # (Using bash -lc keeps it simple and reliable.)
+    exitcode_path = str(paths["exitcode"])
+    wrapped_cmd = " ".join([subprocess.list2cmdline(cmd), f"; echo $? > {subprocess.list2cmdline([exitcode_path])}"])
 
-    # Start in background (non-blocking).
-    # We redirect logs to files.
     with open(paths["stdout"], "wb") as out, open(paths["stderr"], "wb") as err:
         p = subprocess.Popen(
-            cmd,
+            ["bash", "-lc", wrapped_cmd],
             cwd=str(APP_ROOT),
             stdout=out,
             stderr=err,
             env=os.environ.copy(),
         )
 
-    # Save PID so we can query status later
-    (paths["dir"] / "pid.txt").write_text(str(p.pid))
-
+    paths["pid"].write_text(str(p.pid))
     return {"job_id": job_id, "status_url": f"/jobs/{job_id}"}
 
 
@@ -93,36 +92,21 @@ def get_job(job_id: str):
     if not paths["dir"].exists():
         raise HTTPException(status_code=404, detail="job_id not found")
 
-    pid_file = paths["dir"] / "pid.txt"
-    exitcode_file = paths["exitcode"]
-
     # If exit code recorded, we’re done
-    if exitcode_file.exists():
-        exit_code = int(exitcode_file.read_text().strip())
-        status = "succeeded" if exit_code == 0 else "failed"
+    if paths["exitcode"].exists():
+        exit_code = int(paths["exitcode"].read_text().strip())
         return {
             "job_id": job_id,
-            "status": status,
+            "status": "succeeded" if exit_code == 0 else "failed",
             "exit_code": exit_code,
             "stdout_log": str(paths["stdout"]),
             "stderr_log": str(paths["stderr"]),
         }
 
     # Otherwise, check if PID is alive
-    if pid_file.exists():
-        pid = int(pid_file.read_text().strip())
+    if paths["pid"].exists():
+        pid = int(paths["pid"].read_text().strip())
         alive = Path(f"/proc/{pid}").exists()
-        if alive:
-            return {"job_id": job_id, "status": "running"}
-        else:
-            # Process ended but we didn't capture exit code yet (best-effort)
-            # Mark unknown as failed-ish and ask user to check logs
-            return {
-                "job_id": job_id,
-                "status": "finished_unknown",
-                "message": "Process ended; check logs. Consider adding an exit-code writer.",
-                "stdout_log": str(paths["stdout"]),
-                "stderr_log": str(paths["stderr"]),
-            }
+        return {"job_id": job_id, "status": "running" if alive else "finished_pending_exitcode"}
 
     return {"job_id": job_id, "status": "unknown"}
