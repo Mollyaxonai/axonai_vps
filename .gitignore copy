@@ -1,0 +1,42 @@
+*.mp4
+#*.mov
+*~
+#*.json
+.ipynb_checkpoints
+__pycache__
+*.log
+*WithKeypoints.avi
+*_rotated.avi
+.env
+*.pth
+
+# Data
+*/Data/*
+Data/
+Examples/Data/*
+
+# Files for re-processing
+Examples/reprocessSessionServer.py
+Examples/reprocessDataServer.py
+
+*.ini
+*.stats
+
+newsletter.py
+
+.DS_Store
+.vscode/
+# Models / data
+*.onnx
+OpenCapData_experiment/
+OpenCapData_experiment_modified/
+
+
+# Models / data
+*.onnx
+OpenCapData_experiment/
+OpenCapData_experiment_modified/
+__pycache__/
+*.pyc
+.vscode/
+
