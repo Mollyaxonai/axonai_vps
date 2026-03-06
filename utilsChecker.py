@@ -1849,3 +1849,148 @@ def popNeutralPoseImages(cameraDirectories, camerasToUse, tSingleImage,
             os.system(ffmpegCmd)
         
     return
+
+
+def computeAverageIntrinsics_local(
+    session_path: str,
+    calibration_videos,
+    CheckerBoardParams,
+    nImages: int = 25,
+    phoneModel: str | None = None,
+    copy_videos_into_session: bool = True,
+):
+    """
+    Offline version of computeAverageIntrinsics().
+
+    Parameters
+    ----------
+    session_path : str
+        Folder where per-video subfolders will be created and where
+        cameraIntrinsics.pickle files will be saved (same behavior as before).
+        Example: r"D:\\axon-ai\\Data\\Trial_Session\\CameraIntrinsicsCalib"
+
+    calibration_videos : list
+        Either:
+          - list[str] of local video paths, or
+          - list[dict] with keys:
+              {"path": <video_path>, "name": <trial_name_optional>, "model": <model_optional>}
+        Each video should be a checkerboard intrinsics calibration video.
+
+    CheckerBoardParams : dict
+        Same as before (dimensions, squareSize, etc.)
+
+    nImages : int
+        Number of frames to sample from each video for calibration.
+
+    phoneModel : str | None
+        If you want to enforce "same model" logic, pass it here (e.g., "iPhone13,4").
+        If None, we will try to read 'model' from dict entries; otherwise skip the check.
+
+    copy_videos_into_session : bool
+        If True, copy (or overwrite if missing) calibration videos into each subfolder.
+        If False, we will read directly from the original path.
+
+    Returns
+    -------
+    CamParamsAverage, CamParamList, intComp, phoneModel_out
+    """
+    CamParamList = []
+    camModels = []
+
+    # Normalize input format
+    items = []
+    for i, v in enumerate(calibration_videos):
+        if isinstance(v, str):
+            items.append({"path": v, "name": os.path.splitext(os.path.basename(v))[0], "model": None})
+        elif isinstance(v, dict):
+            if "path" not in v:
+                raise ValueError("Each dict entry in calibration_videos must contain key 'path'.")
+            name = v.get("name") or os.path.splitext(os.path.basename(v["path"]))[0]
+            items.append({"path": v["path"], "name": name, "model": v.get("model")})
+        else:
+            raise TypeError("calibration_videos must be a list of str paths or dicts with a 'path' key.")
+
+    for item in items:
+        video_src_path = item["path"]
+        trial_name = item["name"]
+
+        if not os.path.exists(video_src_path):
+            raise FileNotFoundError(f"Calibration video not found: {video_src_path}")
+
+        # Optional model tracking (if provided)
+        if item.get("model") is not None:
+            camModels.append(item["model"])
+
+        # Make directory (folder for trialname, intrinsics also saved there)
+        video_dir = os.path.join(session_path, trial_name)
+        os.makedirs(video_dir, exist_ok=True)
+
+        # Decide where the video will be read from
+        ext = os.path.splitext(video_src_path)[1] or ".mov"
+        video_dst_path = os.path.join(video_dir, trial_name + ext)
+
+        if copy_videos_into_session:
+            if not os.path.exists(video_dst_path):
+                shutil.copy2(video_src_path, video_dst_path)
+            video_path = video_dst_path
+        else:
+            video_path = video_src_path
+
+        intr_path = os.path.join(video_dir, "cameraIntrinsics.pickle")
+
+        if not os.path.exists(intr_path):
+            # Compute intrinsics from images popped out of intrinsic video.
+            # NOTE: video2Images writes images into the folder passed to calcIntrinsics below.
+            video2Images(video_path, filePrefix=trial_name, nImages=nImages)
+
+            CamParams = calcIntrinsics(
+                os.path.join(session_path, trial_name),
+                CheckerBoardParams=CheckerBoardParams,
+                filenames=['*.jpg'],
+                saveFileName=intr_path,
+                visualize=False
+            )
+
+            # Keep the original behavior: if CamParams is None, still write the pickle
+            if CamParams is None:
+                saveCameraParameters(intr_path, CamParams)
+        else:
+            CamParams = loadCameraParameters(intr_path)
+
+        if CamParams is not None:
+            CamParamList.append(CamParams)
+
+    if len(CamParamList) == 0:
+        raise RuntimeError("No valid intrinsics were computed/loaded (CamParamList is empty).")
+
+    # Compute results
+    intComp = {}
+    intComp['fx'] = [c['intrinsicMat'][0, 0] for c in CamParamList]
+    intComp['fy'] = [c['intrinsicMat'][1, 1] for c in CamParamList]
+    intComp['cx'] = [c['intrinsicMat'][0, 2] for c in CamParamList]
+    intComp['cy'] = [c['intrinsicMat'][1, 2] for c in CamParamList]
+    intComp['d']  = np.asarray([c['distortion'] for c in CamParamList])
+
+    for v in list(intComp.keys()):
+        intComp[v + '_u'] = np.mean(intComp[v], axis=0)
+        intComp[v + '_std'] = np.std(intComp[v], axis=0)
+        # Avoid division-by-zero surprises
+        denom = np.where(intComp[v + '_u'] == 0, np.nan, intComp[v + '_u'])
+        intComp[v + '_stdPerc'] = (intComp[v + '_std'] / denom) * 100
+
+    # Model consistency check (optional)
+    phoneModel_out = phoneModel
+    if phoneModel_out is None and len(camModels) > 0:
+        phoneModel_out = camModels[0]
+
+    if phoneModel_out is not None and len(camModels) > 0:
+        if any(cm != phoneModel_out for cm in camModels):
+            raise Exception("You are averaging intrinsics across different phone models.")
+
+    # Output averaged parameters
+    CamParamsAverage = {}
+    params = list(CamParamList[0].keys())
+    for param in params:
+        CamParamsAverage[param] = np.mean(np.asarray([c[param] for c in CamParamList]), axis=0)
+
+    return CamParamsAverage, CamParamList, intComp, phoneModel_out

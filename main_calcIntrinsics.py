@@ -7,79 +7,64 @@
 """
 
 import os 
-import yaml
-import pickle
-
-from utils import importMetadata
-from utils import getDataDirectory
-from utilsChecker import computeAverageIntrinsics
+from utilsChecker import computeAverageIntrinsics_local
 from utilsChecker import saveCameraParameters
 
-# %% Required user inputs.
-sessionName = 'iPhone15_720_60FPS_20231107'
-CheckerBoardParams = {'dimensions':(11,8),'squareSize':60} # gets replaced if metadata present in sessionName folder
+def get_camera_instrincs(calib_videos, CheckerBoardParams):
+    """
+    Compute camera intrinsic parameters from checkerboard calibration videos.
 
-#List of trials - intrinsics from each video are averaged
-trials = ['3dc7b63a-71d8-48d6-b906-28372a527129']
+    The function samples frames from the provided calibration videos, detects
+    checkerboard corners, estimates the camera intrinsics using OpenCV
+    calibration, averages the results across videos, and saves the final
+    parameters to `CameraIntrinsics/cameraIntrinsics.pickle`.
 
-loadTrialInfo = False # Load previous trial names and CheckerBoardParams from file
-saveIntrinsicsForDeployment = True
+    Parameters
+    ----------
+    calib_videos : list[str]
+        Paths to calibration videos containing a checkerboard observed from
+        different angles.
 
-deployedFolderNames = ['Deployed_720_60fps','Deployed'] # both folder names if want to keep the detailed folder
+    CheckerBoardParams : dict
+        Checkerboard specification with keys:
+        - 'dimensions': tuple (width, height) of inner corners
+        - 'squareSize': size of each square (in mm)
+
+    session_path : str
+        Directory where intermediate calibration files (frames, checkerboard
+        detections, per-video intrinsics) will be stored.
+
+    nImages : int
+        Number of frames to sample from each calibration video.
+
+    Returns
+    -------
+    None
+        The averaged camera intrinsics are saved to
+        `CameraIntrinsics/cameraIntrinsics.pickle` in the current directory.
+    """
+    CamParamsAverage, _, _, _ = computeAverageIntrinsics_local(
+        session_path = r"D:\axon-ai\Data\IntrinsicsSession",
+        calibration_videos = calib_videos,
+        CheckerBoardParams = CheckerBoardParams,
+        nImages=25,
+    )
+
+    permIntrinsicDir = os.path.join(os.getcwd(), 'CameraIntrinsics')
+    output_path = os.path.join(permIntrinsicDir, 'cameraIntrinsics.pickle')
+    saveCameraParameters(
+        output_path,
+        CamParamsAverage
+    )
+    print(f"Your camera instrincs is saved at {output_path}")
+
+if __name__ == "__main__":
+
+    CheckerBoardParams = {'dimensions': (11, 8), 'squareSize': 60}
+
+    calib_videos = [
+        r"D:\calib\cam0_intrinsics.mov",
+        r"D:\calib\cam0_intrinsics_take2.mov",
+    ]
     
-# %% Paths to data folder for local testing.
-dataDir = os.path.join(getDataDirectory(),'Data')
-sessionDir = os.path.join(dataDir,'IntrinsicCaptures',sessionName)
-trialFile = os.path.join(sessionDir,'trialInfo.yaml')
-intrinsicComparisonFile = os.path.join(sessionDir,'intrinsicComparison.pkl')
-
-# %% Get checker parameters and filenames if they exist
-
-# TODO this should come from the server API
-# Get checkerboard parameters from metadata.
-metadataPath = os.path.join(sessionDir,'sessionMetadata.yaml')
-
-if os.path.exists(metadataPath):
-    sessionMetadata = importMetadata()
-    CheckerBoardParams = {
-        'dimensions': (sessionMetadata['checkerBoard']['black2BlackCornersWidth_n'],
-                        sessionMetadata['checkerBoard']['black2BlackCornersHeight_n']),
-        'squareSize': sessionMetadata['checkerBoard']['squareSideLength_mm']}
-    print('CheckerBoardParams replaced from metadata file.')
-
-if loadTrialInfo:
-    if os.path.exists(trialFile):
-        with open(trialFile, 'r') as f:
-            trialInfo = yaml.safe_load(f)
-            trials = trialInfo['trials']
-            CheckerBoardParams = {
-                        'dimensions': (trialInfo['nSquaresWidth'],
-                                       trialInfo['nSquaresHeight']),
-                        'squareSize': trialInfo['squareSize']}
-    else:
-        raise Exception('trialFile doesn''t exist. Enter trials and CheckerBoardParams manually.')
-        
-     
-# Compute average intrinsic values from multiple trials of same camera
-CamParamsAverage, CamParamList, intrinsicComparisons, cameraModel = computeAverageIntrinsics(sessionDir,trials,CheckerBoardParams,nImages=50)
-
-
-# Save intrinsics from first camera for deployement 
-if saveIntrinsicsForDeployment:
-    for deployedFolderName in deployedFolderNames:
-        permIntrinsicDir = os.path.join(os.getcwd(), 'CameraIntrinsics',
-                                    cameraModel,deployedFolderName)
-        saveCameraParameters(os.path.join(
-                permIntrinsicDir, 'cameraIntrinsics.pickle'), CamParamsAverage)
-        
-# Save trial info
-trialInfo = {'trials':trials,
-             'nSquaresWidth':CheckerBoardParams['dimensions'][0],
-             'nSquaresHeight':CheckerBoardParams['dimensions'][1],
-             'squareSize':CheckerBoardParams['squareSize'],
-             'cameraModel':cameraModel,}
-with open(trialFile, 'w') as f:
-    yaml.dump(trialInfo,f)
-    
-with open(intrinsicComparisonFile, 'wb') as f:
-    pickle.dump(intrinsicComparisons,f)
+    get_camera_instrincs(calib_videos, CheckerBoardParams)

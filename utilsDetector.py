@@ -475,3 +475,4 @@ def saveJsonsAsPkl(json_directory, outputPklPath, videoName):
         pickle.dump(data4pkl, f)
                 
     return
+
