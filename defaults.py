@@ -1,1 +1,0 @@
-DEFAULT_SYNC_VER = '1.0'

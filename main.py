@@ -13,27 +13,30 @@ import glob
 import numpy as np
 import yaml
 import traceback
+import sys
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
+UTILS_DIR = os.path.join(os.path.dirname(__file__), "utilities")
+if UTILS_DIR not in sys.path:
+    sys.path.insert(0, UTILS_DIR)
 
-from utils import importMetadata, loadCameraParameters, getVideoExtension
-from utils import getDataDirectory, getOpenPoseDirectory, getMMposeDirectory
-from utilsAugmenter import augmentTRC
-from utilsChecker import saveCameraParameters
-from utilsChecker import calcExtrinsicsFromVideo
-from utilsChecker import isCheckerboardUpsideDown
-from utilsChecker import autoSelectExtrinsicSolution
-from utilsChecker import triangulateMultiviewVideo
-from utilsChecker import writeTRCfrom3DKeypoints
-from utilsChecker import popNeutralPoseImages
-from utilsChecker import rotateIntrinsics
-from utilsSync import synchronizeVideos
-from utilsDetector  import runPoseDetector
+from utilities.utils import importMetadata, loadCameraParameters, getVideoExtension
+from utilities.utils import getDataDirectory, getOpenPoseDirectory, getMMposeDirectory
+from utilities.utilsAugmenter import augmentTRC
+from utilities.utilsChecker import saveCameraParameters
+from utilities.utilsChecker import calcExtrinsicsFromVideo
+from utilities.utilsChecker import isCheckerboardUpsideDown
+from utilities.utilsChecker import autoSelectExtrinsicSolution
+from utilities.utilsChecker import triangulateMultiviewVideo
+from utilities.utilsChecker import writeTRCfrom3DKeypoints
+from utilities.utilsChecker import popNeutralPoseImages
+from utilities.utilsChecker import rotateIntrinsics
+from utilities.utilsSync import synchronizeVideos
+from utilities.utilsDetector  import runPoseDetector
 # from utilsAugmenter import augmentTRC
-from utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
-from defaults import DEFAULT_SYNC_VER
+from utilities.utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
 from typing import Optional
 
 def run_opencap(sessionName="Trial_Session", 
@@ -51,7 +54,7 @@ def run_opencap(sessionName="Trial_Session",
          dataDir=None, overwriteAugmenterModel=False,
          filter_frequency='default', overwriteFilterFrequency=False,
          scaling_setup='upright_standing_pose', overwriteScalingSetup=False,
-         overwriteCamerasToUse=False, syncVer=None,):
+         overwriteCamerasToUse=False, syncVer=None,DEFAULT_SYNC_VER = '1.0'):
 
     # %% High-level settings.
     # Camera calibration.

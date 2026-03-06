@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import List, Tuple
 import os
 
-from utilsChecker import computeAverageIntrinsics_local, saveCameraParameters
+from utilities.utilsChecker import computeAverageIntrinsics_local, saveCameraParameters
 
 app = FastAPI(title="Camera Intrinsics API")
 

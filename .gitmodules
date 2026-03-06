@@ -1,3 +1,0 @@
-[submodule "tests/opencap-test-data"]
-	path = tests/opencap-test-data
-	url = https://github.com/stanfordnmbl/opencap-test-data.git
