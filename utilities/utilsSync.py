@@ -19,7 +19,8 @@ from utilsChecker import (loadPklVideo, unpackKeypointList,
                           keypointsToBoundingBox, calcReprojectionError,
                           triangulateMultiviewVideo)
 from utilsCameraPy3 import Camera
-from defaults import DEFAULT_SYNC_VER
+DEFAULT_SYNC_VER = '1.0'
+# from defaults import DEFAULT_SYNC_VER
 
 # %%
 def synchronizeVideos(CameraDirectories, trialRelativePath, pathPoseDetector,
