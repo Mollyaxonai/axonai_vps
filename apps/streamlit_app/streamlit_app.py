@@ -154,6 +154,7 @@ def cloud_generate_report(
     return {"mode": "cloud", "status": "processing", "job_id": job_id}
 
 
+
 # ---------------------------
 # Streamlit App
 # ---------------------------
@@ -318,6 +319,139 @@ if st.session_state.get("calibration_ready", False):
         st.json(st.session_state.calibration)
 
 st.divider()
+
+# ---------------------------
+# Step 2: Upload neutral images
+# ---------------------------
+
+st.header("Step 2 — Upload neutral videos")
+st.caption(
+    "Upload the neutral-pose videos from the same calibrated cameras. "
+    "These will be sent to the backend to generate the augmented TRC."
+)
+
+c1, c2 = st.columns(2)
+neutral_video_left = c1.file_uploader(
+    "Upload LEFT neutral video",
+    type=["mov", "mp4", "avi", "mkv"],
+    key="neutral_video_left",
+)
+neutral_video_right = c2.file_uploader(
+    "Upload RIGHT neutral video",
+    type=["mov", "mp4", "avi", "mkv"],
+    key="neutral_video_right",
+)
+
+run_neutral_clicked = st.button(
+    "🦴 Generate augmented TRC",
+    disabled=(neutral_video_left is None or neutral_video_right is None),
+)
+
+if run_neutral_clicked:
+    try:
+        # Create a unique local folder for this neutral-pose request
+        run_id = f"neutral_{int(time.time())}"
+        upload_root = os.path.join(os.getcwd(), "uploaded_neutral_videos", run_id)
+        os.makedirs(upload_root, exist_ok=True)
+
+        # Save uploaded videos locally (optional, but useful for debugging)
+        left_neutral_path = save_uploaded_file(neutral_video_left, upload_root)
+        right_neutral_path = save_uploaded_file(neutral_video_right, upload_root)
+
+        # Build multipart form-data request
+        files = [
+            (
+                "videos",
+                (
+                    os.path.basename(left_neutral_path),
+                    open(left_neutral_path, "rb"),
+                    "video/mp4",
+                ),
+            ),
+            (
+                "videos",
+                (
+                    os.path.basename(right_neutral_path),
+                    open(right_neutral_path, "rb"),
+                    "video/mp4",
+                ),
+            ),
+        ]
+
+        data = [
+            ("trial_name", "neutral"),
+            ("trial_id", "neutral"),
+            ("cam_names", "Cam0"),
+            ("cam_names", "Cam1"),
+            ("cameras_to_use", "all_available"),
+            ("pose_detector", "OpenPose"),
+            ("resolution_pose_detection", "default"),
+            ("bbox_thr", "0.8"),
+        ]
+
+        with st.spinner("Processing neutral videos and generating augmented TRC..."):
+            resp = requests.post(
+                f"{API_BASE_URL}/process-neutral",
+                files=files,
+                data=data,
+                timeout=1800,
+            )
+
+        # Close file handles
+        for _, file_tuple in files:
+            file_tuple[1].close()
+
+        if resp.status_code == 200:
+            result = resp.json()
+
+            st.success("Neutral videos processed successfully ✅")
+
+            st.session_state["neutral_processing"] = {
+                "run_id": run_id,
+                "uploaded_videos": [left_neutral_path, right_neutral_path],
+                "raw_trc_path": result.get("raw_trc_path"),
+                "augmented_trc_path": result.get("augmented_trc_path"),
+                "settings_path": result.get("settings_path"),
+                "cameras_used": result.get("cameras_used"),
+            }
+
+            st.write(f"Raw TRC: `{result.get('raw_trc_path')}`")
+            st.write(f"Augmented TRC: `{result.get('augmented_trc_path')}`")
+            st.write(f"Settings: `{result.get('settings_path')}`")
+            st.write(f"Cameras used: `{result.get('cameras_used')}`")
+
+            # Optional: direct download from backend if you have a download endpoint
+            try:
+                download_resp = requests.get(
+                    f"{API_BASE_URL}/download-augmented-trc",
+                    timeout=120,
+                )
+                if download_resp.status_code == 200:
+                    st.download_button(
+                        label="Download augmented TRC",
+                        data=download_resp.content,
+                        file_name="neutral_augmented.trc",
+                        mime="text/plain",
+                    )
+            except Exception:
+                pass
+
+        else:
+            try:
+                err = resp.json()
+            except Exception:
+                err = resp.text
+            st.error(f"API error ({resp.status_code}): {err}")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to connect to neutral processing API: {e}")
+    except Exception as e:
+        st.error(f"Neutral processing failed: {e}")
+
+if "neutral_processing" in st.session_state:
+    with st.expander("View neutral processing result", expanded=False):
+        st.json(st.session_state["neutral_processing"])
+
 
 # ---------------------------
 # Step 2: Upload walking videos
