@@ -25,10 +25,10 @@ from utilities.gait_analysis import gait_analysis
 from utilities.utilsGaitAnalysis import import_metadata
 
 
-def run_gait_analysis(session_dir:str, trial_name:str):
+def run_gait_analysis(trial_name:str, sessionName="Trial_Session", sessionName_scaled="Trial_Session",):
 
-    if not trial_name.endswith("_LTSM"):
-        trial_name = trial_name +"_LSTM"
+    # if not trial_name.endswith("_LTSM"):
+    #     trial_name = trial_name +"_LSTM"
     # Select how many gait cycles you'd like to analyze. Select -1 for all gait
     # cycles detected in the trial.
     n_gait_cycles = 1
@@ -50,11 +50,11 @@ def run_gait_analysis(session_dir:str, trial_name:str):
     
     # %% Process data.
     # Init gait analysis and get gait events.
-    legs = ['r']
+    legs = ['l', 'r']
     gait, gait_events = {}, {}
     for leg in legs:
         gait[leg] = gait_analysis(
-            session_dir=session_dir, trial_name=trial_name, leg=leg,
+            trial_name=trial_name, sessionName=sessionName, sessionName_scaled=sessionName_scaled, leg=leg,
             lowpass_cutoff_frequency_for_coordinate_values=filter_frequency,
             n_gait_cycles=n_gait_cycles, gait_style='overground',
             trimming_start=0, trimming_end=0.5)

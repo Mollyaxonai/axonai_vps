@@ -39,6 +39,7 @@ from utilities.utilsDetector  import runPoseDetector
 from utilities.utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
 from typing import Optional
 from gait_results import run_gait_analysis
+from generate_report import generate_clinical_report
 
 def run_opencap(sessionName="Trial_Session", 
          sessionName_scaled = 'Trial_Session_Scaling',
@@ -713,6 +714,12 @@ def run_pipeline(session_path: str, output_dir: Optional[str] = None):
         sessionName = "Trial_Session", 
         sessionName_scaled = "Trial_Session_Scaling", 
     )
+    
+    generate_clinical_report(
+    json_file="gait_output.json",
+    output_pdf="report.pdf"
+    )
+
 
     return {"message": "pipeline ran", "session_path": session_path, "output_dir": output_dir, "gait_analysis":results}
 
