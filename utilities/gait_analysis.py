@@ -18,6 +18,7 @@
     limitations under the License.
 """
  
+import os
 import sys
 sys.path.append('../')
 
@@ -26,21 +27,37 @@ import copy
 import pandas as pd
 from scipy.signal import find_peaks
 from matplotlib import pyplot as plt
+from pathlib import Path
 
 from utilities.utilsKinematics import kinematics
 
 
 class gait_analysis(kinematics):
     
-    def __init__(self, session_dir, trial_name, leg='auto',
+    def __init__(self, 
+                trial_name,
+                sessionName = "Trial_Session", 
+                sessionName_scaled = "Trial_Session_Scaling",
+                sessionDir=None, 
+                sessionDir_scaled=None, leg='auto',
                  lowpass_cutoff_frequency_for_coordinate_values=-1,
                  n_gait_cycles=-1, gait_style='auto', trimming_start=1., 
                  trimming_end=6.):
         
+        sessionDir_parent = Path(os.path.dirname(os.path.abspath(__file__))).parent
+        if sessionDir is None: 
+            sessionDir = os.path.join(sessionDir_parent, "Data", sessionName)
+        if sessionDir_scaled is None: 
+            sessionDir_scaled = os.path.join(sessionDir_parent, "Data", sessionName_scaled)
+        
+        
         # Inherit init from kinematics class.
         super().__init__(
-            session_dir, 
-            trial_name, 
+            trialName = trial_name, 
+            sessionName = sessionName,
+            sessionName_scaled = sessionName_scaled, 
+            sessionDir = sessionDir, 
+            sessionDir_scaled = sessionDir_scaled, 
             lowpass_cutoff_frequency_for_coordinate_values=lowpass_cutoff_frequency_for_coordinate_values)
         
         # We might want to trim the start/end of the trial to remove bad data. 
@@ -53,7 +70,7 @@ class gait_analysis(kinematics):
         self.trimming_end =  0 # trimming_end
                         
         # Marker data load and filter.
-        self.markerDict = self.get_marker_dict(session_dir, trial_name, 
+        self.markerDict = self.get_marker_dict(sessionDir, trial_name, 
             lowpass_cutoff_frequency = lowpass_cutoff_frequency_for_coordinate_values)
 
         # Coordinate values.

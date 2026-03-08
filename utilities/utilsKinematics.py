@@ -25,6 +25,7 @@ import utilsGaitAnalysis as utils
 import numpy as np
 import pandas as pd
 import scipy.interpolate as interpolate
+from pathlib import Path
 
 
 from utilsProcessing import lowPassFilter
@@ -35,9 +36,20 @@ from scipy.spatial.transform import Rotation
 
 class kinematics:
     
-    def __init__(self, sessionDir, trialName, 
-                 modelName="Data/Trial_Session_Scaling/OpenSimData/OpenPose_default/Model/LaiUhlrich2022_scaled.osim",
-                 lowpass_cutoff_frequency_for_coordinate_values=-1):
+    def __init__(self, 
+                trialName,
+                sessionName = "Trial_Session", 
+                sessionName_scaled = "Trial_Session_Scaling",
+                sessionDir=None, 
+                sessionDir_scaled=None, 
+                modelName="LaiUhlrich2022", 
+                lowpass_cutoff_frequency_for_coordinate_values=-1):
+        
+        sessionDir_parent = Path(os.path.dirname(os.path.abspath(__file__))).parent
+        if sessionDir is None: 
+            sessionDir = os.path.join(sessionDir_parent, "Data", sessionName)
+        if sessionDir_scaled is None: 
+            sessionDir_scaled = os.path.join(sessionDir_parent, "Data", sessionName_scaled)
         
         self.lowpass_cutoff_frequency_for_coordinate_values = (
             lowpass_cutoff_frequency_for_coordinate_values)
@@ -45,14 +57,9 @@ class kinematics:
         # Model.
         opensim.Logger.setLevelString('error')
         
-        modelBasePath = os.path.join(sessionDir, 'OpenSimData', 'Model')
+        modelBasePath = os.path.join(sessionDir_scaled, 'OpenSimData', 'OpenPose_default' ,'Model')
         # Load model if specified, otherwise load the one that was on server
-        if modelName is None:
-            modelName = utils.get_model_name_from_metadata(sessionDir)
-            modelPath = os.path.join(modelBasePath,modelName)
-        else:
-            modelPath = modelName # os.path.join(modelBasePath,
-            #                      '{}.osim'.format(modelName))
+        modelPath = os.path.join(modelBasePath,'{}_scaled.osim'.format(modelName))
             
         # make sure model exists
         if not os.path.exists(modelPath):
@@ -62,11 +69,10 @@ class kinematics:
         self.model.initSystem()
         
         # Motion file with coordinate values.
-        motionPath = os.path.join(sessionDir, 'OpenSimData', 'Kinematics',
-                                  '{}.mot'.format(trialName))
+        motionPath = os.path.join(sessionDir_scaled, 'OpenSimData', 'OpenPose_default', 'Kinematics',
+                                  '{}_LSTM.mot'.format(trialName))
         
-        # Create time-series table with coordinate values
-        motionPath = "Data/Trial_Session_Scaling/OpenSimData/OpenPose_default/Kinematics/33_LSTM.mot"             
+        # Create time-series table with coordinate values           
         self.table = opensim.TimeSeriesTable(motionPath)        
         tableProcessor = opensim.TableProcessor(self.table)
         self.columnLabels = list(self.table.getColumnLabels())
@@ -168,13 +174,15 @@ class kinematics:
                     self.model, self.table))
         return self._stateTrajectory
     
-    def get_marker_dict(self, session_dir="Data/Trial_Session/MarkerData/OpenPose_default/PostAugmentation_v0.3/", trial_name="33_LSTM", 
+    def get_marker_dict(self, session_dir, trial_name,
                         lowpass_cutoff_frequency=-1):
+        
         
         trcFilePath = os.path.join(session_dir,
                                    'MarkerData',
-                                   '{}.trc'.format(trial_name))
-        trcFilePath = "Data/Trial_Session/MarkerData/OpenPose_default/PostAugmentation_v0.3/33_LSTM.trc"
+                                   'OpenPose_default', 
+                                   'PostAugmentation_v0.3', 
+                                   '{}_LSTM.trc'.format(trial_name))
         
         markerDict = trc_2_dict(trcFilePath)
         if lowpass_cutoff_frequency > 0:

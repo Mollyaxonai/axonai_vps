@@ -709,8 +709,9 @@ def run_pipeline(session_path: str, output_dir: Optional[str] = None):
     )
 
     results = run_gait_analysis(
-        session_dir= os.path.join(preAugmentationDir, f"{trialName}_LSTM.trc"), 
-        trial_name = trialName
+        trial_name = trialName, 
+        sessionName = "Trial_Session", 
+        sessionName_scaled = "Trial_Session_Scaling", 
     )
 
     return {"message": "pipeline ran", "session_path": session_path, "output_dir": output_dir, "gait_analysis":results}
