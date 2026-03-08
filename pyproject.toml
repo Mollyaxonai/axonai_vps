@@ -2,13 +2,16 @@
 name = "axon-ai"
 version = "0.1.0"
 description = "Comprehensive gait metrics tools"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+
 authors = [
     { name = "Jinyan Wang", email = "jinyan@axon-ai.co.uk" },
     { name = "Fatimah Al-ani", email = "fatima@axon-ai.co.uk" },
 ]
-readme = "README.md"
-urls = { Homepage = "https://github.com/fmaa23/axon-ai" }
-requires-python = ">=3.9,<3.13"
+
+urls = { Homepage = "https://github.com/Mollyaxonai/axonai_vps" }
+
 dependencies = [
     "scipy",
     "numpy>=1.20.0,<2.0.0",
@@ -16,11 +19,24 @@ dependencies = [
     "pandas>=2.0.0",
     "tensorflow>=2.13.0",
     "typing_extensions>=4.9.0",
-    "plotly", 
-    "opencap",
+    "plotly",
+    "numpy",
+    "scipy",
+    "ffmpeg", 
+    "matplotlib",
     "fastapi>=0.110",
-    "uvicorn[standard]>=0.27"
+    "onnxruntime",
+    "python-decouple",
+    "uvicorn[standard]>=0.27", 
+    "streamlit", 
+    "pyarrow<15", 
+    "reportlab"
+
 ]
+
+[tool.setuptools.packages.find]
+include = ["apps*", "utilities*", "API_wrappers*", "MarkerAugmenter*", "CameraIntrinsics*"]
+exclude = ["docker*", "third_party*", "OpenCapData_experiment*"]
 
 [dependency-groups]
 dev = [
@@ -39,6 +55,3 @@ default-groups = ["dev"]
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools>=60.0.0", "wheel"]
-
-[tool.uv.sources]
-opencap = { git = "ssh://git@github.com/fmaa23/opencap-core-private.git"}

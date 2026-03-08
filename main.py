@@ -38,6 +38,8 @@ from utilities.utilsDetector  import runPoseDetector
 # from utilsAugmenter import augmentTRC
 from utilities.utilsOpenSim import runScaleTool, getScaleTimeRange, runIKTool, generateVisualizerJson
 from typing import Optional
+from gait_results import run_gait_analysis
+from generate_report import generate_clinical_report
 
 def run_opencap(sessionName="Trial_Session", 
          sessionName_scaled = 'Trial_Session_Scaling',
@@ -106,7 +108,7 @@ def run_opencap(sessionName="Trial_Session",
     else:
         sessionDir = os.path.join(dataDir, 'Data', sessionName)
     parent = Path(baseDir).parent
-    sessionDir_scaled = os.path.join(parent, 'Data', sessionName_scaled)
+    sessionDir_scaled = os.path.join(baseDir, 'Data', sessionName_scaled)
     # ---------- NO NEED -------------------------------------
         
     session_metadata_folder = os.path.join(baseDir,"OpenCapData_experiment","sessionMetadata.yaml")
@@ -180,6 +182,7 @@ def run_opencap(sessionName="Trial_Session",
         postAugmentationDir = os.path.join(
             sessionDir, markerDataFolderName, 
             'PostAugmentation_{}'.format(augmenterModel))
+    
     os.makedirs(postAugmentationDir, exist_ok=True)
         
     # %% Dump settings in yaml.
@@ -508,7 +511,7 @@ def run_opencap(sessionName="Trial_Session",
     # runs OpenSim to turn your augmented marker TRC into a scaled musculoskeletal model + joint kinematics
     # ----------------------------------------------------
     if runOpenSimPipeline:
-        openSimPipelineDir = os.path.join(baseDir, "opensimPipeline")        
+        openSimPipelineDir = os.path.join(baseDir, "third_party", "opensimPipeline")        
         
         if genericFolderNames:
             openSimFolderName = 'OpenSimData'
@@ -634,6 +637,8 @@ def run_opencap(sessionName="Trial_Session",
             settings['verticalOffset'] = vertical_offset_settings 
         with open(pathSettings, 'w') as file:
             yaml.dump(settings, file)
+    
+    return preAugmentationDir, trialName
 
 def run_pipeline(session_path: str, output_dir: Optional[str] = None):
     """
@@ -697,14 +702,26 @@ def run_pipeline(session_path: str, output_dir: Optional[str] = None):
         scaleModel=True
     )
 
-    run_opencap(
+    preAugmentationDir, trialName = run_opencap(
         sessionName="Trial_Session",
         trialName="33",
         trial_id="33",
         scaleModel=False
     )
 
-    return {"message": "pipeline ran", "session_path": session_path, "output_dir": output_dir}
+    results = run_gait_analysis(
+        trial_name = trialName, 
+        sessionName = "Trial_Session", 
+        sessionName_scaled = "Trial_Session_Scaling", 
+    )
+    
+    generate_clinical_report(
+    json_file="gait_output.json",
+    output_pdf="report.pdf"
+    )
+
+
+    return {"message": "pipeline ran", "session_path": session_path, "output_dir": output_dir, "gait_analysis":results}
 
 if __name__ == "__main__":
     # keep your CLI behavior if you want

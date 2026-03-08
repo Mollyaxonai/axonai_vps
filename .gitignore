@@ -1,12 +1,11 @@
-*.py[cod]
-*.db
-__pycache__/
-assets/external/
-.states
-.web
 ## pycahe files
 **.pyc
 
 axon_ai.egg-info
 
 experiment_data/
+uploaded_calibration_videos/
+
+plots/
+**.pdf
+**.ipynb

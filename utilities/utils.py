@@ -19,12 +19,12 @@ import pandas as pd
 from scipy import signal
 from urllib3.util.retry import Retry
 
-from utilsAuth import getToken
-from utilsAPI import getAPIURL
+# from utilsAuth import getToken
+# from utilsAPI import getAPIURL
 
-API_URL = getAPIURL()
-# API_TOKEN = getToken()
-API_TOKEN = None
+# API_URL = getAPIURL()
+# # API_TOKEN = getToken()
+# API_TOKEN = None
 #%% Rest of utils
 
 def getDataDirectory(isDocker=False):

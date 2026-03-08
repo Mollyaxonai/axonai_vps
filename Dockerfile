@@ -36,6 +36,7 @@ RUN mkdir -p -m 0700 /root/.ssh && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts
 
 # Sync into that environment
+RUN pip install --upgrade cmake
 RUN --mount=type=ssh uv sync --python /workspace/.venv/bin/python
 
 # Sanity check: default python in the image should be 3.12.x
